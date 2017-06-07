@@ -29,12 +29,12 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import de.halirutan.mathematica.intentions.IntentionBundle;
-import de.halirutan.mathematica.parsing.psi.api.Expression;
 import de.halirutan.mathematica.parsing.psi.api.FunctionCall;
 import de.halirutan.mathematica.parsing.psi.api.Symbol;
 import de.halirutan.mathematica.parsing.psi.api.lists.List;
 import de.halirutan.mathematica.parsing.psi.util.LocalizationConstruct.ConstructType;
 import de.halirutan.mathematica.parsing.psi.util.MathematicaPsiElementFactory;
+import de.halirutan.mathematica.parsing.psi.util.MathematicaPsiUtilities;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -75,7 +75,7 @@ public class MoveVariableToLocalisation implements IntentionAction {
       return false;
     }
     PsiElement element = findElementAtCaret(file, editor);
-    if (element != null) {
+    if (element != null && !MathematicaPsiUtilities.isBuiltinSymbol(element)) {
       PsiReference reference = element.getReference();
       if (reference != null) {
         PsiElement resolve = reference.resolve();
@@ -104,12 +104,9 @@ public class MoveVariableToLocalisation implements IntentionAction {
       FunctionCall localisationElement = processor.myLocalisationElement;
       if (localisationElement != null && localisationElement.isValid()) {
         PsiElement initList = localisationElement.getArgument(1);
-        if (initList instanceof List) {
+        if (initList instanceof List && !PsiTreeUtil.hasErrorElements(initList)) {
           MathematicaPsiElementFactory factory = new MathematicaPsiElementFactory(project);
-          String text = initList.getText();
-          Expression newList = factory.createExpressionFromText(text.substring(0, text.length() - 1) +
-              ", " + element.getText() + "}");
-          initList.replace(newList);
+          factory.addItemToList((List) initList, element);
         }
       }
     }

@@ -190,6 +190,9 @@
     <intentionAction>
       <className>de.halirutan.mathematica.intentions.localization.MoveVariableToLocalisation</className>
     </intentionAction>
+    <intentionAction>
+      <className>de.halirutan.mathematica.intentions.createmessage.CreateUsageMessage</className>
+    </intentionAction>
   </extensions>
 
   <actions>

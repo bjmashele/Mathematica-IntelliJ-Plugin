@@ -23,8 +23,12 @@ package de.halirutan.mathematica.parsing.psi.util;
 
 import com.google.common.collect.Lists;
 import com.intellij.psi.*;
+import de.halirutan.mathematica.codeinsight.completion.SymbolInformationProvider;
+import de.halirutan.mathematica.codeinsight.completion.SymbolInformationProvider.SymbolInformation;
 import de.halirutan.mathematica.parsing.MathematicaElementTypes;
 import de.halirutan.mathematica.parsing.psi.api.FunctionCall;
+import de.halirutan.mathematica.parsing.psi.api.MessageName;
+import de.halirutan.mathematica.parsing.psi.api.StringifiedSymbol;
 import de.halirutan.mathematica.parsing.psi.api.Symbol;
 import de.halirutan.mathematica.parsing.psi.api.assignment.Set;
 import de.halirutan.mathematica.parsing.psi.api.assignment.SetDelayed;
@@ -36,6 +40,7 @@ import de.halirutan.mathematica.parsing.psi.util.LocalizationConstruct.Construct
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -44,6 +49,40 @@ import java.util.List;
  */
 public class MathematicaPsiUtilities {
 
+
+  public static boolean isBuiltinSymbol(@NotNull final PsiElement element) {
+    if (element instanceof Symbol) {
+      final HashMap<String, SymbolInformation> builtIn = SymbolInformationProvider.getSymbolNames();
+      final String fullSymbolName = ((Symbol) element).getMathematicaContext().isEmpty() ?
+          "System`" + ((Symbol) element).getFullSymbolName() : ((Symbol) element).getFullSymbolName();
+      return builtIn.containsKey(fullSymbolName);
+    }
+    return false;
+  }
+
+  /**
+   * checks if a symbol is wrapped in a usage message
+   *
+   * @param element symbol to check
+   * @return true if the parent is a MessageName ::usage
+   */
+  public static boolean isSymbolUsageMessage(@NotNull final PsiElement element) {
+    return isSymbolMessageWithName(element, "usage");
+  }
+
+  public static boolean isSymbolMessageWithName(@NotNull final PsiElement element, final String name) {
+    if (element instanceof Symbol) {
+      final PsiElement parent = element.getParent();
+      if (parent instanceof MessageName) {
+        final PsiElement[] children = parent.getChildren();
+        if (children.length == 2 && children[1] instanceof StringifiedSymbol) {
+          final String text = children[1].getText();
+          return text.equals(name);
+        }
+      }
+    }
+    return false;
+  }
 
   /**
    * Extracts the assignment symbol from assignment operations, <code>g[x_]:=x^2</code> should return the g and  x

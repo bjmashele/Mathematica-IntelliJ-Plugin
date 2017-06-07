@@ -30,6 +30,7 @@ import de.halirutan.mathematica.filetypes.MathematicaFileType;
 import de.halirutan.mathematica.parsing.psi.api.Expression;
 import de.halirutan.mathematica.parsing.psi.api.MathematicaPsiFile;
 import de.halirutan.mathematica.parsing.psi.api.Symbol;
+import de.halirutan.mathematica.parsing.psi.api.lists.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -72,6 +73,16 @@ public class MathematicaPsiElementFactory {
       return (Symbol) symbol;
     }
     throw new IncorrectOperationException("The supplied string is not a valid Mathematica Symbol.");
+  }
+
+  public PsiElement addItemToList(@NotNull final List list, @NotNull PsiElement item) {
+    String text = list.getText();
+    if (list.getChildren().length == 0) {
+      text = text.substring(0, text.length() - 1) + item.getText() + "}";
+    } else {
+      text = text.substring(0, text.length() - 1) + ", " + item.getText() + "}";
+    }
+    return list.replace(createExpressionFromText(text));
   }
 
   /*
