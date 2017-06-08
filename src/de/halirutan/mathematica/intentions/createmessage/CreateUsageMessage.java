@@ -22,6 +22,8 @@
 package de.halirutan.mathematica.intentions.createmessage;
 
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.openapi.editor.CaretModel;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
@@ -29,15 +31,36 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.util.IncorrectOperationException;
 import de.halirutan.mathematica.intentions.IntentionBundle;
+import de.halirutan.mathematica.parsing.psi.SymbolAssignmentType;
 import de.halirutan.mathematica.parsing.psi.api.Symbol;
+import de.halirutan.mathematica.parsing.psi.util.GlobalDefinitionCollector;
+import de.halirutan.mathematica.parsing.psi.util.GlobalDefinitionCollector.AssignmentProperty;
 import de.halirutan.mathematica.parsing.psi.util.MathematicaPsiUtilities;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author patrick (07.06.17).
  */
 public class CreateUsageMessage implements IntentionAction {
+
+  private static final Set<SymbolAssignmentType> ourValidAssignments = new HashSet<>(5);
+
+  static {
+    ourValidAssignments.add(SymbolAssignmentType.SET_ASSIGNMENT);
+    ourValidAssignments.add(SymbolAssignmentType.SET_DELAYED_ASSIGNMENT);
+    ourValidAssignments.add(SymbolAssignmentType.TAG_SET_ASSIGNMENT);
+    ourValidAssignments.add(SymbolAssignmentType.TAG_SET_DELAYED_ASSIGNMENT);
+    ourValidAssignments.add(SymbolAssignmentType.UP_SET_ASSIGNMENT);
+    ourValidAssignments.add(SymbolAssignmentType.UP_SET_DELAYED_ASSIGNMENT);
+  }
+
+  private AssignmentProperty myFoundAssignment = null;
+
   @Nls
   @NotNull
   @Override
@@ -61,18 +84,37 @@ public class CreateUsageMessage implements IntentionAction {
       return false;
     }
     if (elementAtCaret instanceof Symbol) {
-      final Symbol definition = ((Symbol) elementAtCaret).getResolveElement();
-      if (definition != null) {
-        if (MathematicaPsiUtilities.isSymbolUsageMessage(definition)) {
-          return false;
-        }
-        final PsiElement[] allUsages = definition.getElementsReferencingToMe();
-        for (PsiElement usage : allUsages) {
-          if (MathematicaPsiUtilities.isSymbolUsageMessage(usage)) {
+      // we know that the element under the caret is a symbol
+      // now we need to know if it is indeed a valid definition
+      GlobalDefinitionCollector collector = new GlobalDefinitionCollector(file);
+      final Map<String, HashSet<AssignmentProperty>> assignments = collector.getAssignments();
+      if (!assignments.containsKey(((Symbol) elementAtCaret).getFullSymbolName())) {
+        return false;
+      }
+
+      // we have collected all definitions of the file and we know that our symbol-name appears in this list
+      // now we need to know if the symbol at the caret is one of those places where it gets a definition
+      final HashSet<AssignmentProperty> assignment = assignments.get(((Symbol) elementAtCaret).getFullSymbolName());
+
+      // check if there is already a usage definition
+      for (AssignmentProperty current : assignment) {
+        if (current.myAssignmentType.equals(SymbolAssignmentType.MESSAGE_ASSIGNMENT)) {
+          if (MathematicaPsiUtilities.isSymbolUsageMessage(current.myAssignmentSymbol)) {
             return false;
           }
         }
-        return true;
+      }
+
+      for (AssignmentProperty current : assignment) {
+        if (current.myAssignmentSymbol.equals(elementAtCaret)) {
+          // finally, we know the symbol at caret is some form of definition
+          // but we don't want to introduce usage messages based on e.g. SyntaxInformation[symbol] definitions
+          // so we check if we have a valid Set, SetDelayed, ...
+          if (ourValidAssignments.contains(current.myAssignmentType)) {
+            myFoundAssignment = current;
+            return true;
+          }
+        }
       }
     }
     return false;
@@ -80,7 +122,19 @@ public class CreateUsageMessage implements IntentionAction {
 
   @Override
   public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
-
+    final Document document = editor.getDocument();
+    StripPatternVisitor lhsVisitor = new StripPatternVisitor();
+    myFoundAssignment.myLhsOfAssignment.accept(lhsVisitor);
+    final PsiElement myAssignmentSymbol = myFoundAssignment.myAssignmentSymbol;
+    StringBuilder usage = new StringBuilder(myAssignmentSymbol.getText());
+    usage.append("::usage = \"");
+    usage.append(lhsVisitor.getCleanedDefinition());
+    usage.append(" \";\n");
+    if (document.isWritable()) {
+      document.insertString(myAssignmentSymbol.getTextOffset(), usage);
+      final CaretModel caretModel = editor.getCaretModel();
+      caretModel.moveToOffset(myAssignmentSymbol.getTextOffset() + usage.length() - 3);
+    }
   }
 
   @Override

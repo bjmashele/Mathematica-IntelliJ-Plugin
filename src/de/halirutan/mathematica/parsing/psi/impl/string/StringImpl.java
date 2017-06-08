@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Patrick Scheibe
+ * Copyright (c) 2017 Patrick Scheibe
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -23,12 +23,14 @@ package de.halirutan.mathematica.parsing.psi.impl.string;
 
 import com.intellij.lang.ASTNode;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.impl.source.resolve.reference.ReferenceProvidersRegistry;
 import com.intellij.util.IncorrectOperationException;
 import de.halirutan.mathematica.filetypes.MathematicaFileType;
 import de.halirutan.mathematica.parsing.MathematicaElementTypes;
+import de.halirutan.mathematica.parsing.psi.MathematicaVisitor;
 import de.halirutan.mathematica.parsing.psi.api.string.MString;
 import de.halirutan.mathematica.parsing.psi.impl.MathematicaPsiFileImpl;
 import de.halirutan.mathematica.parsing.psi.impl.OperatorNameProviderImpl;
@@ -58,6 +60,7 @@ public class StringImpl extends OperatorNameProviderImpl implements MString {
     return this;
   }
 
+
   @Override
   public PsiReference getReference() {
     final PsiReference[] references = getReferences();
@@ -77,4 +80,14 @@ public class StringImpl extends OperatorNameProviderImpl implements MString {
     }
     return myReferences;
   }
+
+  @Override
+  public void accept(@NotNull PsiElementVisitor visitor) {
+    if (visitor instanceof MathematicaVisitor) {
+      ((MathematicaVisitor) visitor).visitString(this);
+    } else {
+      super.accept(visitor);
+    }
+  }
+
 }
