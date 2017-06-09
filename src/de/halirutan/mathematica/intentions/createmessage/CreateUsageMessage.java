@@ -22,9 +22,7 @@
 package de.halirutan.mathematica.intentions.createmessage;
 
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.openapi.editor.CaretModel;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -44,6 +42,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
+ * Intention for automatically creating a symbol::usage message when over a function definition that does not already
+ * have one.
  * @author patrick (07.06.17).
  */
 public class CreateUsageMessage implements IntentionAction {
@@ -126,14 +126,26 @@ public class CreateUsageMessage implements IntentionAction {
     StripPatternVisitor lhsVisitor = new StripPatternVisitor();
     myFoundAssignment.myLhsOfAssignment.accept(lhsVisitor);
     final PsiElement myAssignmentSymbol = myFoundAssignment.myAssignmentSymbol;
-    StringBuilder usage = new StringBuilder(myAssignmentSymbol.getText());
+    StringBuilder usage = new StringBuilder("\n" + myAssignmentSymbol.getText());
     usage.append("::usage = \"");
     usage.append(lhsVisitor.getCleanedDefinition());
     usage.append(" \";\n");
     if (document.isWritable()) {
-      document.insertString(myAssignmentSymbol.getTextOffset(), usage);
+      int offsetToInsert;
+      FindPlaceForUsageVisitor placeVisitor = new FindPlaceForUsageVisitor();
+      file.accept(placeVisitor);
+      final PsiElement lastUsageElement = placeVisitor.getLastUsageElement();
+      if (lastUsageElement != null) {
+        final int lineNumber = document.getLineNumber(lastUsageElement.getTextOffset());
+        offsetToInsert = document.getLineEndOffset(lineNumber);
+      } else {
+        offsetToInsert = myAssignmentSymbol.getTextOffset();
+      }
+      document.insertString(offsetToInsert, usage);
       final CaretModel caretModel = editor.getCaretModel();
-      caretModel.moveToOffset(myAssignmentSymbol.getTextOffset() + usage.length() - 3);
+      caretModel.moveToOffset(offsetToInsert + usage.length() - 3);
+      final ScrollingModel scrollingModel = editor.getScrollingModel();
+      scrollingModel.scrollToCaret(ScrollType.CENTER);
     }
   }
 

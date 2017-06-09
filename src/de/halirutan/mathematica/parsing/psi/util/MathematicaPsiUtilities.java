@@ -60,6 +60,14 @@ public class MathematicaPsiUtilities {
     return false;
   }
 
+  public static boolean isUsageMessage(@NotNull final PsiElement element) {
+    if (element instanceof MessageName) {
+      final StringifiedSymbol tag = ((MessageName) element).getTag();
+      return tag != null && tag.getText().matches("usage");
+    }
+    return false;
+  }
+
   /**
    * checks if a symbol is wrapped in a usage message
    *
